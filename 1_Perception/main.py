@@ -44,10 +44,14 @@ def plot_log(loss, acc):
     fig = plt.figure()
 
     ax1 = fig.add_subplot(111)
-    ax1.plot(list(range(1, len(loss) + 1)), loss, linewidth=2)
+    plt.grid(True)
+
+    ax1.plot(list(range(1, len(loss) + 1)), loss, c="orange", label='Acc')
+    ax1.plot(list(range(1, len(loss) + 1)), loss, linewidth=2, label='Loss')
     ax1.set_ylabel('Loss')
     ax1.set_title("Log")
     ax1.set_xlabel('Epochs')
+    plt.legend(loc=5)
 
     ax2 = ax1.twinx()  # this is the important function
     ax2.plot(list(range(1, len(acc) + 1)), acc, c="orange", linewidth=2)
