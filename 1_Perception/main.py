@@ -39,12 +39,32 @@ def show_clf(x, y, b, w):
     plt.show()
 
 
+def plot_log(loss, acc):
+    plt.figure()
+    fig = plt.figure()
+
+    ax1 = fig.add_subplot(111)
+    ax1.plot(list(range(1, len(loss) + 1)), loss, linewidth=2)
+    ax1.set_ylabel('Loss')
+    ax1.set_title("Log")
+    ax1.set_xlabel('Epochs')
+
+    ax2 = ax1.twinx()  # this is the important function
+    ax2.plot(list(range(1, len(acc) + 1)), acc, c="orange", linewidth=2)
+    ax2.set_ylabel('Accuracy')
+
+    plt.show()
+
+
 def main():
 
     # 随机初始化参数
     x, y = random_dots(num_observations)
     w = np.random.randn(2, 1)
     b = np.random.randn(1, 1)
+
+    loss_log = []
+    acc_log = []
 
     for i in range(epochs):
 
@@ -54,11 +74,14 @@ def main():
         w[1] += np.mean(lr * loss * x[:, 1])
         b += np.mean(lr * loss * 1)
 
-        acc = np.sum(((outputs > 0) * 2 - 1).squeeze(-1) == y) / len(y) * 100
-        print("Epochs %3d, loss: %.4f, acc: %.2f%%" %
+        loss_log.append(np.mean(loss * loss))
+        acc = np.sum(((outputs > 0) * 2 - 1).squeeze(-1) == y) / len(y)
+        acc_log.append(acc)
+        print("Epochs %3d, loss: %.4f, acc: %.4f" %
               (i + 1, np.mean(loss), acc))
 
     show_clf(x, y, b, w)
+    plot_log(loss_log, acc_log)
 
 
 if __name__ == '__main__':
