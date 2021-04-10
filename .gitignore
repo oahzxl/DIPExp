@@ -51,3 +51,5 @@ _darcs
 !/datasets/*.*
 /projects/*/datasets
 /models
+
+/titanic
