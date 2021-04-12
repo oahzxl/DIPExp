@@ -23,18 +23,21 @@ def setup_seed(seed):
 def init_args():
     parser = argparse.ArgumentParser()
 
-    # parser.add_argument('--mode', type=str, default="train", help='train/test')
-    parser.add_argument('--mode', type=str, default="test", help='train/test')
+    parser.add_argument('--mode', type=str, default="train", help='train/test')
+    # parser.add_argument('--mode', type=str, default="test", help='train/test')
 
     parser.add_argument('--batch-size', type=int, default=8)
-    parser.add_argument('--lr', type=float, default=3e-4)
+    parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--optim', type=str, default="Adam")
     parser.add_argument('--sche', type=str, default="None")
     parser.add_argument('--box', type=float, default=10)
     # parser.add_argument('--sche', type=str, default="cos")
     # parser.add_argument('--sche', type=str, default="reduce")
 
-    parser.add_argument('--model', type=str, default="res18")
+    parser.add_argument('--backbone', type=str, default="res18")
+    # parser.add_argument('--backbone', type=str, default="cnn")
+    # parser.add_argument('--head', type=str, default="base")
+    parser.add_argument('--head', type=str, default="fpn")
 
     parser.add_argument('--num-epochs', type=float, default=20)
 
@@ -43,7 +46,7 @@ def init_args():
     parser.add_argument('--num-workers', type=int, default=8)
 
     parser.add_argument('--data-path', type=str, default="./tiny_vid/")
-    parser.add_argument('--ckp-path', type=str, default="./log/res18.tar")
+    parser.add_argument('--ckp-path', type=str, default="./log/res18_3737.tar")
     parser.add_argument('--save-path', type=str, default="./log")
     if not os.path.exists(parser.parse_args().save_path):
         os.mkdir(parser.parse_args().save_path)
@@ -57,13 +60,19 @@ if __name__ == "__main__":
     setup_seed(0)
     print(args)
 
-    if args.model == "cnn":
+    if args.backbone == "cnn":
         backbone = CNN()
-    elif args.model == "res18":
-        backbone = resnet18()
+    elif args.backbone == "res18":
+        backbone = resnet18(pretrained=True)
     else:
         raise ValueError
-    model = Head(backbone.cuda()).cuda()
+
+    if args.head == "base":
+        model = Head(backbone.cuda()).cuda()
+    elif args.head == "fpn":
+        model = FPNHead(backbone.cuda()).cuda()
+    else:
+        raise ValueError
 
     if args.mode == "train":
         train_dataset = VidDataset(args.data_path, (args.h, args.w))

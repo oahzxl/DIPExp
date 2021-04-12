@@ -10,7 +10,7 @@ from eval import evaluate
 def train(model, train_loader, eval_loader, args):
 
     criterion_class = nn.CrossEntropyLoss()
-    criterion_box = nn.SmoothL1Loss()
+    criterion_box = nn.MSELoss()
     # criterion = LabelSmoothCELoss()
     # criterion = WeightedLabelSmoothCELoss(1978, 2168, 1227)
 
@@ -56,6 +56,6 @@ def train(model, train_loader, eval_loader, args):
 
         torch.save({
                 "model_state_dict": model.state_dict(),
-            }, os.path.join(args.save_path, args.model + "_acc_%.5f" % best_acc + ".tar"))
+            }, os.path.join(args.save_path, args.backbone + "_acc_%.5f" % best_acc + ".tar"))
 
     print("Done.")

@@ -29,8 +29,8 @@ class VidDataset(torch.utils.data.Dataset):
                 class_pic = class_pic[:150]
                 label = label[:150]
             else:
-                class_pic = class_pic[150:]
-                label = label[150:]
+                class_pic = class_pic[150:180]
+                label = label[150:180]
 
             for p in range(len(class_pic)):
                 p_box = label[p][:-1].split(' ')[1:]

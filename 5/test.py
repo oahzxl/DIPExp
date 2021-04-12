@@ -78,7 +78,7 @@ def test(model, eval_loader, args):
                 # img = draw_box_cv(ori_image[j], boxes[j], predict[j], predict_class[j, predict[j]])
                 img[j] = draw_box_cv(img[j], boxes[j], classes[j], 1, c=0)
                 img[j] = draw_box_cv(img[j], predict_box[j], predict[j], predict_class[j, predict[j]], c=1)
-                plt.imshow(cv2.cvtColor(img[j], cv2.COLOR_RGB2BGR))
-                plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-                plt.show()
-
+                # plt.imshow(cv2.cvtColor(img[j], cv2.COLOR_RGB2BGR))
+                # plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+                # plt.show()
+                cv2.imwrite(data["path"][j].replace("JPEG", "jpg"), img[j])
