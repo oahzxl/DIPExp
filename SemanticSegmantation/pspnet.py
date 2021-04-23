@@ -19,7 +19,7 @@ class PSPModule(nn.Module):
 
     def forward(self, feats):
         h, w = feats.size(2), feats.size(3)
-        priors = [F.upsample(input=stage(feats), size=(h, w), mode='bilinear', align_corners=True) for stage in self.stages] + [feats]
+        priors = [F.interpolate(input=stage(feats), size=(h, w), mode='bilinear', align_corners=True) for stage in self.stages] + [feats]
         bottle = self.bottleneck(torch.cat(priors, 1))
         return self.relu(bottle)
 
@@ -35,7 +35,7 @@ class PSPUpsample(nn.Module):
 
     def forward(self, x):
         h, w = 2 * x.size(2), 2 * x.size(3)
-        p = F.upsample(input=x, size=(h, w), mode='bilinear', align_corners=True)
+        p = F.interpolate(input=x, size=(h, w), mode='bilinear', align_corners=True)
         return self.conv(p)
 
 
@@ -56,14 +56,15 @@ class PSPNet(nn.Module):
         )
 
         self.use_cuda = torch.cuda.is_available()
-        if self.use_cuda: self.cuda()
+        if self.use_cuda:
+            self.cuda()
 
     def forward(self, x):
         n, c, h, w = x.size()
         if self.use_cuda:
             x = x.cuda()
         f = self.feats(x)[0]
-        #up_f = F.interpolate(f, scale_factor=2, mode='bilinear', align_corners=True)
+        # up_f = F.interpolate(f, scale_factor=2, mode='bilinear', align_corners=True)
         up_f = f
         p = self.psp(up_f)
         p = self.drop_1(p)

@@ -6,7 +6,9 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import argparse
 import torchvision
+from deeplabv3 import DeepLabv3
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 
@@ -15,6 +17,16 @@ random.seed(0)
 from pspnet import PSPNet
 
 readvdnames = lambda x: open(x).read().rstrip().split('\n')
+
+
+def init_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--optim', type=str, default="Adam")
+    parser.add_argument('--num-epochs', type=float, default=30)
+    parser.add_argument('--ckpt-dir', type=str, default="./work_dirs/test")
+    return parser.parse_args()
 
 
 ################################# DEFINE DATASET #################################
@@ -143,28 +155,41 @@ def get_confusion_matrix_for_3d(gt_label, pred_label, class_num):
 
 
 if __name__ == "__main__":
+    args = init_args()
+    print(args)
+
     IMG_SIZE = 128
     print("=> the training size is {}".format(IMG_SIZE))
 
-    train_loader = DataLoader(TinySegData(img_size=IMG_SIZE, phase='train'), batch_size=32, shuffle=True, num_workers=8)
-    # val_loader = DataLoader(TinySegData(phase='val'), batch_size=1, shuffle=False, num_workers=0)
+    train_loader = DataLoader(TinySegData(img_size=IMG_SIZE, phase='train'), batch_size=args.batch_size,
+                              shuffle=True, num_workers=8)
+    val_loader = DataLoader(TinySegData(img_size=IMG_SIZE, phase='val'), batch_size=1, shuffle=False, num_workers=8)
 
     model = PSPNet(n_classes=6, pretrained=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # model = DeepLabv3()
+
+    if args.optim == 'Adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    elif args.optim == 'SGD':
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    else:
+        raise EOFError
+
     criterion = torch.nn.CrossEntropyLoss()
     mkdirs = lambda x: os.makedirs(x, exist_ok=True)
     # model.load_state_dict(torch.load("ckpt_seg/epoch_79_iou0.88.pth"))
 
-    ckpt_dir = "ckpt_seg"
+    ckpt_dir = args.ckpt_dir
     mkdirs(ckpt_dir)
-    epoch = 100
+    epoch = args.num_epochs
     best_iou = 0
 
     for i in range(0, epoch):
         # train
         model.train()
         epoch_iou = []
-        epoch_start = time.time()
+        val_iou = []
+        epoch_loss = []
         for j, (images, seg_gts, rets) in enumerate(train_loader):
             images = images.cuda()
             seg_gts = seg_gts.cuda()
@@ -175,8 +200,8 @@ if __name__ == "__main__":
             loss = loss_seg
             loss.backward()
             optimizer.step()
+            epoch_loss.append(loss.item())
 
-            # epoch_loss += loss.item()
             if j % 10 == 0:
                 seg_preds = torch.argmax(seg_logit, dim=1)
                 seg_preds_np = seg_preds.detach().cpu().numpy()
@@ -189,22 +214,48 @@ if __name__ == "__main__":
                 IU_array = (tp / np.maximum(1.0, pos + res - tp))
                 mean_IU = IU_array.mean()
 
-                log_str = "[E{}/{} - {}] ".format(i, epoch, j)
-                log_str += "loss[seg]: {:0.4f}, miou: {:0.4f}, ".format(loss_seg.item(), mean_IU)
-                print(log_str)
+                # log_str = "[E{}/{} - {:3d}] ".format(i, epoch, j)
+                # log_str += "loss[seg]: {:0.4f}, miou: {:0.4f}, ".format(loss_seg.item(), mean_IU)
+                # print(log_str)
 
-                images_np = np.transpose((images.cpu().numpy() + 1) * 127.5, (0, 2, 3, 1))
-                n, h, w, c = images_np.shape
-                images_np = images_np.reshape(n * h, w, -1)[:, :, 0]
-                seg_preds_np = seg_preds_np.reshape(n * h, w)
-                visual_np = np.concatenate([images_np, seg_preds_np * 40], axis=1)  # NH * W
-                cv2.imwrite('visual.png', visual_np)
+                # images_np = np.transpose((images.cpu().numpy() + 1) * 127.5, (0, 2, 3, 1))
+                # n, h, w, c = images_np.shape
+                # images_np = images_np.reshape(n * h, w, -1)[:, :, 0]
+                # seg_preds_np = seg_preds_np.reshape(n * h, w)
+                # visual_np = np.concatenate([images_np, seg_preds_np * 40], axis=1)  # NH * W
+                # cv2.imwrite('visual.png', visual_np)
+
                 epoch_iou.append(mean_IU)
 
+        with torch.no_grad():
+            model.eval()
+            for j, (images, seg_gts, rets) in enumerate(val_loader):
+                images = images.cuda()
+                seg_gts = seg_gts.cuda()
+
+                seg_logit = model(images)
+                # loss_seg = criterion(seg_logit, seg_gts.long())
+                # loss = loss_seg
+
+                seg_preds = torch.argmax(seg_logit, dim=1)
+                seg_preds_np = seg_preds.detach().cpu().numpy()
+                seg_gts_np = seg_gts.cpu().numpy()
+
+                confusion_matrix = get_confusion_matrix_for_3d(seg_gts_np, seg_preds_np, class_num=6)
+                pos = confusion_matrix.sum(1)
+                res = confusion_matrix.sum(0)
+                tp = np.diag(confusion_matrix)
+                IU_array = (tp / np.maximum(1.0, pos + res - tp))
+                mean_IU = IU_array.mean()
+
+                val_iou.append(mean_IU)
+
         epoch_iou = np.mean(epoch_iou)
-        epoch_end = time.time()
-        epoch_time = round(epoch_end - epoch_start, 2)
-        print("=> This epoch costs {}s...".format(epoch_time))
-        if i % 10 == 0 or i == epoch - 1:
-            print("=> saving to {}".format("{}/epoch_{}_iou{:0.2f}.pth".format(ckpt_dir, i, epoch_iou)))
-            torch.save(model.state_dict(), "{}/epoch_{}_iou{:0.2f}.pth".format(ckpt_dir, i, epoch_iou))
+        epoch_loss = np.mean(epoch_loss)
+        val_iou = np.mean(val_iou)
+        if val_iou > best_iou:
+            best_iou = val_iou
+            torch.save(model.state_dict(), "{}/epoch_{}_iou{:0.4f}.pth".format(ckpt_dir, i, val_iou))
+        print("[Epoch %2d] train loss: %.4f, train iou: %.4f, val iou: %.4f, best iou: %.4f" % (
+            i + 1, epoch_loss, epoch_iou, val_iou, best_iou))
+        # print("=> saving to {}".format("{}/epoch_{}_iou{:0.2f}.pth".format(ckpt_dir, i, epoch_iou)))
